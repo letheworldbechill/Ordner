@@ -1,0 +1,405 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NavigoOrdnung</title>
+    <style>
+        /* Allgemeine Stile */
+        body {
+            margin: 0;
+            font-family: Arial, sans-serif;
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+        }
+        
+        header {
+            background-color: #333;
+            color: #fff;
+            padding: 10px 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        header h1 {
+            margin: 0;
+            font-size: 1.5em;
+        }
+        
+        header button {
+            padding: 8px 16px;
+            font-size: 1em;
+            cursor: pointer;
+            background-color: #555;
+            color: #fff;
+            border: none;
+            border-radius: 4px;
+            transition: background-color 0.3s;
+        }
+        
+        header button:hover {
+            background-color: #777;
+        }
+        
+        main {
+            flex: 1;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            background-color: #f0f0f0;
+            overflow: auto;
+            padding: 10px;
+        }
+        
+        #grid-container {
+            display: grid;
+            gap: 2px;
+            /* Grid-Größe wird dynamisch gesetzt */
+        }
+        
+        .cell {
+            width: 30px;
+            height: 30px;
+            background-color: white; /* Standardfarbe für Platzhalter */
+            border: 1px solid #000;
+            cursor: pointer;
+            box-sizing: border-box;
+            transition: background-color 0.3s;
+        }
+        
+        .cell.active {
+            background-color: red; /* Farbe für schmutzige Zellen */
+        }
+        
+        .cell.active.clean {
+            background-color: lightgreen; /* Farbe für gereinigte Zellen */
+        }
+        
+        .cell.inactive {
+            background-color: white; /* Weiß für inaktive Platzhalter */
+            cursor: default;
+        }
+        
+        /* Modal Stile */
+        .modal {
+            display: none; /* Versteckt das Modal standardmäßig */
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            overflow: auto;
+            background-color: rgba(0,0,0,0.4);
+        }
+        
+        .modal-content {
+            background-color: #fefefe;
+            margin: 5% auto;
+            padding: 20px;
+            border: 1px solid #888;
+            width: 90%;
+            max-width: 800px;
+            max-height: 90%;
+            overflow-y: auto;
+            border-radius: 8px;
+        }
+        
+        .close {
+            color: #aaa;
+            float: right;
+            font-size: 28px;
+            font-weight: bold;
+            cursor: pointer;
+        }
+        
+        .close:hover,
+        .close:focus {
+            color: black;
+        }
+        
+        #settings-grid {
+            display: grid;
+            gap: 2px;
+            margin-bottom: 20px;
+            /* Grid-Größe wird dynamisch gesetzt */
+        }
+        
+        .settings-cell {
+            width: 25px;
+            height: 25px;
+            background-color: #ccc;
+            border: 1px solid #000;
+            cursor: pointer;
+            box-sizing: border-box;
+            transition: background-color 0.3s;
+        }
+        
+        .settings-cell.active {
+            background-color: #333;
+        }
+        
+        /* Responsive Anpassungen */
+        @media (max-width: 600px) {
+            #grid-container {
+                grid-template-columns: repeat(var(--grid-cols), 20px);
+                grid-template-rows: repeat(var(--grid-rows), 20px);
+            }
+        
+            .cell {
+                width: 20px;
+                height: 20px;
+            }
+        
+            #settings-grid {
+                grid-template-columns: repeat(var(--grid-cols), 20px);
+                grid-template-rows: repeat(var(--grid-rows), 20px);
+            }
+        
+            .settings-cell {
+                width: 20px;
+                height: 20px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <h1>NavigoOrdnung</h1>
+        <button id="settings-button">Einstellungen</button>
+    </header>
+    <main>
+        <div id="grid-container"></div>
+    </main>
+
+    <!-- Einstellungen Modal -->
+    <div id="settings-modal" class="modal">
+        <div class="modal-content">
+            <span class="close">&times;</span>
+            <h2>Einstellungen</h2>
+            <div>
+                <label for="grid-rows">Anzahl der Reihen (z.B. 7): </label>
+                <input type="number" id="grid-rows" min="1" max="50" value="20">
+            </div>
+            <div>
+                <label for="grid-cols">Anzahl der Spalten (z.B. 15): </label>
+                <input type="number" id="grid-cols" min="1" max="50" value="20">
+            </div>
+            <button id="apply-grid-size" style="margin-top:10px; padding: 8px 16px; font-size: 1em; cursor: pointer; background-color: #007bff; color: #fff; border: none; border-radius: 4px;">Größe anwenden</button>
+            <h3>Apartment Layout</h3>
+            <p>Klicke auf die Zellen, um sie sichtbar (aktiv) oder unsichtbar (inaktiv) zu machen.</p>
+            <div id="settings-grid"></div>
+            <button id="save-settings" style="padding: 8px 16px; font-size: 1em; cursor: pointer; background-color: #28a745; color: #fff; border: none; border-radius: 4px;">Speichern</button>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const gridContainer = document.getElementById('grid-container');
+            const settingsButton = document.getElementById('settings-button');
+            const settingsModal = document.getElementById('settings-modal');
+            const closeModal = document.querySelector('.close');
+            const settingsGrid = document.getElementById('settings-grid');
+            const saveSettingsButton = document.getElementById('save-settings');
+            const gridRowsInput = document.getElementById('grid-rows');
+            const gridColsInput = document.getElementById('grid-cols');
+            const applyGridSizeButton = document.getElementById('apply-grid-size');
+
+            let GRID_ROWS = parseInt(localStorage.getItem('gridRows')) || 20;
+            let GRID_COLS = parseInt(localStorage.getItem('gridCols')) || 20;
+            document.documentElement.style.setProperty('--grid-rows', GRID_ROWS);
+            document.documentElement.style.setProperty('--grid-cols', GRID_COLS);
+
+            let apartmentLayout = [];
+            let cellStates = [];
+
+            // Initialisiere das Hauptgitter
+            function initializeGrid() {
+                gridContainer.innerHTML = '';
+                gridContainer.style.gridTemplateColumns = `repeat(${GRID_COLS}, 30px)`;
+                gridContainer.style.gridTemplateRows = `repeat(${GRID_ROWS}, 30px)`;
+
+                for (let row = 0; row < GRID_ROWS; row++) {
+                    for (let col = 0; col < GRID_COLS; col++) {
+                        const cell = document.createElement('div');
+                        cell.classList.add('cell');
+                        const key = `${row}-${col}`;
+                        if (cellStates[row][col]) {
+                            cell.classList.add('clean');
+                        } else if (apartmentLayout[row][col]) {
+                            cell.classList.add('active');
+                        } else {
+                            cell.classList.add('inactive');
+                        }
+
+                        // Klick-Event zum Umschalten des Zellzustands (nur bei aktiven Zellen)
+                        if (apartmentLayout[row][col]) {
+                            cell.addEventListener('click', () => {
+                                cell.classList.toggle('clean');
+                                cellStates[row][col] = !cellStates[row][col];
+                                localStorage.setItem(key, cellStates[row][col] ? 'clean' : 'dirty');
+                            });
+                        }
+
+                        gridContainer.appendChild(cell);
+                    }
+                }
+            }
+
+            // Lade Einstellungen aus localStorage
+            function loadSettings() {
+                const savedLayout = localStorage.getItem('apartmentLayout');
+                if (savedLayout) {
+                    apartmentLayout = JSON.parse(savedLayout);
+                } else {
+                    // Initialisiere Standard-Layout (alle Zellen aktiv)
+                    apartmentLayout = Array.from({ length: GRID_ROWS }, () => Array(GRID_COLS).fill(true));
+                }
+
+                // Lade Zellzustände
+                cellStates = Array.from({ length: GRID_ROWS }, () => Array(GRID_COLS).fill(false));
+                for (let row = 0; row < GRID_ROWS; row++) {
+                    for (let col = 0; col < GRID_COLS; col++) {
+                        const key = `${row}-${col}`;
+                        const state = localStorage.getItem(key);
+                        cellStates[row][col] = (state === 'clean');
+                    }
+                }
+            }
+
+            // Initialisiere das Einstellungsgitter im Modal
+            function initializeSettingsModal() {
+                settingsGrid.innerHTML = '';
+                settingsGrid.style.gridTemplateColumns = `repeat(${GRID_COLS}, 25px)`;
+                settingsGrid.style.gridTemplateRows = `repeat(${GRID_ROWS}, 25px)`;
+
+                for (let row = 0; row < GRID_ROWS; row++) {
+                    for (let col = 0; col < GRID_COLS; col++) {
+                        const cell = document.createElement('div');
+                        cell.classList.add('settings-cell');
+                        if (apartmentLayout[row][col]) {
+                            cell.classList.add('active');
+                        }
+
+                        cell.addEventListener('click', () => {
+                            cell.classList.toggle('active');
+                            apartmentLayout[row][col] = !apartmentLayout[row][col];
+                        });
+
+                        settingsGrid.appendChild(cell);
+                    }
+                }
+            }
+
+            // Speichern der Einstellungen
+            function saveSettings() {
+                localStorage.setItem('apartmentLayout', JSON.stringify(apartmentLayout));
+                localStorage.setItem('gridRows', GRID_ROWS);
+                localStorage.setItem('gridCols', GRID_COLS);
+                initializeGrid();
+                closeSettingsModal();
+            }
+
+            // Öffnen des Einstellungsmodals
+            settingsButton.addEventListener('click', () => {
+                initializeSettingsModal();
+                settingsModal.style.display = 'block';
+            });
+
+            // Schließen des Einstellungsmodals
+            closeModal.addEventListener('click', closeSettingsModal);
+            window.addEventListener('click', (event) => {
+                if (event.target === settingsModal) {
+                    closeSettingsModal();
+                }
+            });
+
+            function closeSettingsModal() {
+                settingsModal.style.display = 'none';
+            }
+
+            // Anwenden der neuen Gittergröße
+            applyGridSizeButton.addEventListener('click', () => {
+                const newRows = parseInt(gridRowsInput.value);
+                const newCols = parseInt(gridColsInput.value);
+
+                if (isNaN(newRows) || newRows < 1 || newRows > 50) {
+                    alert('Bitte gib eine gültige Anzahl der Reihen zwischen 1 und 50 ein.');
+                    return;
+                }
+
+                if (isNaN(newCols) || newCols < 1 || newCols > 50) {
+                    alert('Bitte gib eine gültige Anzahl der Spalten zwischen 1 und 50 ein.');
+                    return;
+                }
+
+                if (newRows !== GRID_ROWS || newCols !== GRID_COLS) {
+                    GRID_ROWS = newRows;
+                    GRID_COLS = newCols;
+                    document.documentElement.style.setProperty('--grid-rows', GRID_ROWS);
+                    document.documentElement.style.setProperty('--grid-cols', GRID_COLS);
+
+                    // Reset apartmentLayout und cellStates
+                    apartmentLayout = Array.from({ length: GRID_ROWS }, () => Array(GRID_COLS).fill(true));
+                    cellStates = Array.from({ length: GRID_ROWS }, () => Array(GRID_COLS).fill(false));
+
+                    // Entferne alle gespeicherten Zellzustände
+                    for (let row = 0; row < GRID_ROWS; row++) {
+                        for (let col = 0; col < GRID_COLS; col++) {
+                            const key = `${row}-${col}`;
+                            localStorage.removeItem(key);
+                        }
+                    }
+
+                    // Aktualisiere das Hauptgitter und das Einstellungsgitter
+                    initializeGrid();
+                    initializeSettingsModal();
+                }
+            });
+
+            // Tägliches Zurücksetzen um 02:00 Uhr
+            function scheduleDailyReset() {
+                const now = new Date();
+                const resetTime = new Date();
+                resetTime.setHours(2, 0, 0, 0);
+
+                if (now > resetTime) {
+                    resetTime.setDate(resetTime.getDate() + 1);
+                }
+
+                const timeout = resetTime - now;
+
+                setTimeout(() => {
+                    resetCells();
+                    scheduleDailyReset(); // Wiederhole täglich
+                }, timeout);
+            }
+
+            // Setze alle Zellen zurück
+            function resetCells() {
+                for (let row = 0; row < GRID_ROWS; row++) {
+                    for (let col = 0; col < GRID_COLS; col++) {
+                        const key = `${row}-${col}`;
+                        const cell = gridContainer.children[row * GRID_COLS + col];
+                        if (apartmentLayout[row][col]) {
+                            cell.classList.remove('clean');
+                            cellStates[row][col] = false;
+                            localStorage.setItem(key, 'dirty');
+                        }
+                    }
+                }
+            }
+
+            // Initialisiere alles beim Start
+            loadSettings();
+            initializeGrid();
+            scheduleDailyReset();
+
+            // Speichern-Button
+            saveSettingsButton.addEventListener('click', saveSettings);
+        });
+    </script>
+</body>
+</html>
